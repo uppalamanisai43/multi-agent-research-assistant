@@ -18,7 +18,7 @@ class ResearchState(TypedDict):
 
 
 llm = ChatGroq(
-    model="qwen/qwen3.6-27b",
+    model="groq/compound-mini",
     api_key=st.secrets["GROQ_API_KEY"],
     max_tokens=500
 )
