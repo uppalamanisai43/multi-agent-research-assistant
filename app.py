@@ -12,7 +12,11 @@ st.info(
     "Educational research only — not financial advice or a recommendation "
     "to buy, sell, or invest."
 )
-
+depth = st.selectbox(
+    "Research depth",
+    ["Quick", "Standard", "Deep"],
+    index=1
+)
 topic = st.text_area(
     "Enter a research topic",
     placeholder="Example: Benefits and risks of artificial intelligence in education",
