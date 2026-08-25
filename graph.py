@@ -10,6 +10,7 @@ from tavily import TavilyClient
 
 class ResearchState(TypedDict):
     topic: str
+    depth: str
     plan: str
     queries: List[str]
     sources: List[Dict[str, str]]
@@ -58,9 +59,15 @@ def planner(state: ResearchState):
 You are a research planner.
 
 Topic: {state["topic"]}
+Research depth: {state["depth"]}
 Critic feedback: {feedback or "No previous feedback."}
 
 Create a short research plan and exactly three web-search queries.
+
+For Quick, use direct broad queries.
+For Standard, cover benefits, risks, and evidence.
+For Deep, use detailed queries covering evidence, limitations, and policy context.
+
 If critic feedback exists, target the missing information.
 
 Use exactly this format:
@@ -176,6 +183,7 @@ def writer(state: ResearchState):
 You are a careful research report writer.
 
 Topic: {state["topic"]}
+Research depth: {state["depth"]}
 Research plan: {state["plan"]}
 Critic feedback: {state["critic_feedback"]}
 
@@ -197,6 +205,8 @@ Rules:
 
 - Never put citation labels such as [1] or 【1】 inside a URL.
 - Do not show reasoning or think tags.
+- For finance-related topics, include this statement under Limitations:
+  "Educational research only — not financial advice."
 
 Sources:
 {source_text}
