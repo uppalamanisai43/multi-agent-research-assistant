@@ -1,5 +1,8 @@
 from typing import TypedDict, List, Dict
+import time
+
 import streamlit as st
+from groq import RateLimitError
 from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
 from tavily import TavilyClient
@@ -31,7 +34,23 @@ tavily = TavilyClient(
 def remove_thinking(text: str) -> str:
     if "</think>" in text:
         return text.split("</think>", 1)[1].strip()
+
     return text.strip()
+
+
+def ask_llm(prompt: str) -> str:
+    """Wait and retry if Groq temporarily reaches its token limit."""
+    for attempt in range(3):
+        try:
+            return remove_thinking(llm.invoke(prompt).content)
+
+        except RateLimitError:
+            if attempt == 2:
+                raise
+
+            time.sleep(8)
+
+    raise RuntimeError("Unable to receive an LLM response.")
 
 
 def planner(state: ResearchState):
@@ -57,7 +76,7 @@ QUERIES:
 - <query 3>
 """
 
-    response = remove_thinking(llm.invoke(prompt).content)
+    response = ask_llm(prompt)
     plan_part, query_part = response.split("QUERIES:", 1)
 
     queries = [
@@ -136,7 +155,7 @@ Sources:
 {source_text}
 """
 
-    response = remove_thinking(llm.invoke(prompt).content)
+    response = ask_llm(prompt)
     decision = "RESEARCH_MORE" if "RESEARCH_MORE" in response else "APPROVE"
 
     return {
@@ -179,7 +198,7 @@ Sources:
 """
 
     return {
-        "report": remove_thinking(llm.invoke(prompt).content),
+        "report": ask_llm(prompt),
         "events": state["events"] + ["Writer generated the final report."]
     }
 
@@ -202,6 +221,7 @@ graph.add_node("critic", critic)
 graph.add_node("writer", writer)
 
 graph.set_entry_point("planner")
+
 graph.add_edge("planner", "researcher")
 graph.add_edge("researcher", "critic")
 
