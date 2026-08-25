@@ -3,6 +3,7 @@ import time
 
 import streamlit as st
 from groq import RateLimitError
+from google import genai
 from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
 from tavily import TavilyClient
@@ -11,6 +12,7 @@ from tavily import TavilyClient
 class ResearchState(TypedDict):
     topic: str
     depth: str
+    provider: str
     plan: str
     queries: List[str]
     sources: List[Dict[str, str]]
@@ -21,10 +23,14 @@ class ResearchState(TypedDict):
     events: List[str]
 
 
-llm = ChatGroq(
+groq_llm = ChatGroq(
     model="groq/compound-mini",
     api_key=st.secrets["GROQ_API_KEY"],
     max_tokens=500
+)
+
+gemini_client = genai.Client(
+    api_key=st.secrets["GEMINI_API_KEY"]
 )
 
 tavily = TavilyClient(
@@ -39,14 +45,24 @@ def remove_thinking(text: str) -> str:
     return text.strip()
 
 
-def ask_llm(prompt: str) -> str:
-    """Retry temporarily rate-limited Groq requests."""
+def ask_llm(prompt: str, provider: str) -> str:
+    """Call the selected provider; retry Groq if temporarily rate-limited."""
+
+    if provider == "Gemini":
+        response = gemini_client.models.generate_content(
+            model="gemini-3.5-flash",
+            contents=prompt
+        )
+        return remove_thinking(response.text or "")
+
     for attempt in range(3):
         try:
-            return remove_thinking(llm.invoke(prompt).content)
+            return remove_thinking(groq_llm.invoke(prompt).content)
+
         except RateLimitError:
             if attempt == 2:
                 raise
+
             time.sleep(8)
 
     raise RuntimeError("Unable to receive an LLM response.")
@@ -81,7 +97,7 @@ QUERIES:
 - <query 3>
 """
 
-    response = ask_llm(prompt)
+    response = ask_llm(prompt, state["provider"])
     plan_part, query_part = response.split("QUERIES:", 1)
 
     queries = [
@@ -160,7 +176,7 @@ Sources:
 {source_text}
 """
 
-    response = ask_llm(prompt)
+    response = ask_llm(prompt, state["provider"])
     decision = "RESEARCH_MORE" if "RESEARCH_MORE" in response else "APPROVE"
 
     return {
@@ -213,7 +229,7 @@ Sources:
 """
 
     return {
-        "report": ask_llm(prompt),
+        "report": ask_llm(prompt, state["provider"]),
         "events": state["events"] + ["Writer generated the final report."]
     }
 
@@ -236,7 +252,6 @@ graph.add_node("critic", critic)
 graph.add_node("writer", writer)
 
 graph.set_entry_point("planner")
-
 graph.add_edge("planner", "researcher")
 graph.add_edge("researcher", "critic")
 
