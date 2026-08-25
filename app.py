@@ -21,11 +21,6 @@ depth = st.selectbox(
     index=1
 )
 
-provider = st.selectbox(
-    "LLM provider",
-    ["Groq", "Gemini"]
-)
-
 topic = st.text_area(
     "Enter a research topic",
     placeholder="Example: Benefits and risks of artificial intelligence in education",
@@ -39,7 +34,6 @@ if st.button("Generate Report", type="primary"):
         initial_state = {
             "topic": topic,
             "depth": depth,
-            "provider": provider,
             "plan": "",
             "queries": [],
             "sources": [],
