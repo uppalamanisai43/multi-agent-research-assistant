@@ -2,4 +2,3 @@ streamlit
 langgraph
 langchain-groq
 tavily-python
-google-genai
