@@ -8,7 +8,10 @@ st.set_page_config(
 )
 
 st.title("🔎 Multi-Agent Research Assistant")
-st.caption("Planner → Researcher → Critic → Writer")
+st.info(
+    "Educational research only — not financial advice or a recommendation "
+    "to buy, sell, or invest."
+)
 
 topic = st.text_area(
     "Enter a research topic",
