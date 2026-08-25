@@ -3,7 +3,6 @@ import time
 
 import streamlit as st
 from groq import RateLimitError
-from google import genai
 from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
 from tavily import TavilyClient
@@ -12,7 +11,6 @@ from tavily import TavilyClient
 class ResearchState(TypedDict):
     topic: str
     depth: str
-    provider: str
     plan: str
     queries: List[str]
     sources: List[Dict[str, str]]
@@ -23,14 +21,10 @@ class ResearchState(TypedDict):
     events: List[str]
 
 
-groq_llm = ChatGroq(
+llm = ChatGroq(
     model="groq/compound-mini",
     api_key=st.secrets["GROQ_API_KEY"],
     max_tokens=500
-)
-
-gemini_client = genai.Client(
-    api_key=st.secrets["GEMINI_API_KEY"]
 )
 
 tavily = TavilyClient(
@@ -41,28 +35,16 @@ tavily = TavilyClient(
 def remove_thinking(text: str) -> str:
     if "</think>" in text:
         return text.split("</think>", 1)[1].strip()
-
     return text.strip()
 
 
-def ask_llm(prompt: str, provider: str) -> str:
-    """Call the selected provider; retry Groq if temporarily rate-limited."""
-
-    if provider == "Gemini":
-        response = gemini_client.models.generate_content(
-            model="gemini-3.5-flash",
-            contents=prompt
-        )
-        return remove_thinking(response.text or "")
-
+def ask_llm(prompt: str) -> str:
     for attempt in range(3):
         try:
-            return remove_thinking(groq_llm.invoke(prompt).content)
-
+            return remove_thinking(llm.invoke(prompt).content)
         except RateLimitError:
             if attempt == 2:
                 raise
-
             time.sleep(8)
 
     raise RuntimeError("Unable to receive an LLM response.")
@@ -97,7 +79,7 @@ QUERIES:
 - <query 3>
 """
 
-    response = ask_llm(prompt, state["provider"])
+    response = ask_llm(prompt)
     plan_part, query_part = response.split("QUERIES:", 1)
 
     queries = [
@@ -176,7 +158,7 @@ Sources:
 {source_text}
 """
 
-    response = ask_llm(prompt, state["provider"])
+    response = ask_llm(prompt)
     decision = "RESEARCH_MORE" if "RESEARCH_MORE" in response else "APPROVE"
 
     return {
@@ -229,7 +211,7 @@ Sources:
 """
 
     return {
-        "report": ask_llm(prompt, state["provider"]),
+        "report": ask_llm(prompt),
         "events": state["events"] + ["Writer generated the final report."]
     }
 
@@ -240,7 +222,6 @@ def choose_next_step(state: ResearchState):
         and state["iteration_count"] < 3
     ):
         return "planner"
-
     return "writer"
 
 
@@ -258,10 +239,7 @@ graph.add_edge("researcher", "critic")
 graph.add_conditional_edges(
     "critic",
     choose_next_step,
-    {
-        "planner": "planner",
-        "writer": "writer"
-    }
+    {"planner": "planner", "writer": "writer"}
 )
 
 graph.add_edge("writer", END)
