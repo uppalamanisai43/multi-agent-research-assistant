@@ -19,7 +19,8 @@ class ResearchState(TypedDict):
 
 llm = ChatGroq(
     model="qwen/qwen3.6-27b",
-    api_key=st.secrets["GROQ_API_KEY"]
+    api_key=st.secrets["GROQ_API_KEY"],
+    max_tokens=500
 )
 
 tavily = TavilyClient(
@@ -68,7 +69,9 @@ QUERIES:
     return {
         "plan": plan_part.replace("PLAN:", "").strip(),
         "queries": queries[:3],
-        "events": state.get("events", []) + ["Planner created the research plan."]
+        "events": state.get("events", []) + [
+            "Planner created the research plan."
+        ]
     }
 
 
@@ -79,7 +82,7 @@ def researcher(state: ResearchState):
         response = tavily.search(
             query=query,
             search_depth="basic",
-            max_results=3
+            max_results=2
         )
 
         for item in response.get("results", []):
@@ -97,10 +100,12 @@ def researcher(state: ResearchState):
             unique_sources.append(source)
             seen_urls.add(source["url"])
 
+    sources = unique_sources[:5]
+
     return {
-        "sources": unique_sources[:8],
+        "sources": sources,
         "events": state["events"] + [
-            f"Researcher collected {len(unique_sources[:8])} sources."
+            f"Researcher collected {len(sources)} sources."
         ]
     }
 
@@ -109,7 +114,7 @@ def critic(state: ResearchState):
     source_text = "\n\n".join(
         f"Title: {source['title']}\n"
         f"URL: {source['url']}\n"
-        f"Snippet: {source['content'][:400]}"
+        f"Snippet: {source['content'][:250]}"
         for source in state["sources"]
     )
 
@@ -146,7 +151,7 @@ def writer(state: ResearchState):
     source_text = "\n\n".join(
         f"[{index}] {source['title']}\n"
         f"URL: {source['url']}\n"
-        f"Content: {source['content'][:1000]}"
+        f"Content: {source['content'][:350]}"
         for index, source in enumerate(state["sources"], start=1)
     )
 
@@ -157,7 +162,8 @@ Topic: {state["topic"]}
 Research plan: {state["plan"]}
 Critic feedback: {state["critic_feedback"]}
 
-Write a Markdown report with:
+Write a concise Markdown report with:
+
 # Title
 ## Executive Summary
 ## Key Findings
@@ -184,10 +190,12 @@ def choose_next_step(state: ResearchState):
         and state["iteration_count"] < 3
     ):
         return "planner"
+
     return "writer"
 
 
 graph = StateGraph(ResearchState)
+
 graph.add_node("planner", planner)
 graph.add_node("researcher", researcher)
 graph.add_node("critic", critic)
@@ -196,11 +204,16 @@ graph.add_node("writer", writer)
 graph.set_entry_point("planner")
 graph.add_edge("planner", "researcher")
 graph.add_edge("researcher", "critic")
+
 graph.add_conditional_edges(
     "critic",
     choose_next_step,
-    {"planner": "planner", "writer": "writer"}
+    {
+        "planner": "planner",
+        "writer": "writer"
+    }
 )
+
 graph.add_edge("writer", END)
 
 research_app = graph.compile()
