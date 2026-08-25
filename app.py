@@ -8,15 +8,19 @@ st.set_page_config(
 )
 
 st.title("🔎 Multi-Agent Research Assistant")
+st.caption("Planner → Researcher → Critic → Writer")
+
 st.info(
     "Educational research only — not financial advice or a recommendation "
     "to buy, sell, or invest."
 )
+
 depth = st.selectbox(
     "Research depth",
     ["Quick", "Standard", "Deep"],
     index=1
 )
+
 topic = st.text_area(
     "Enter a research topic",
     placeholder="Example: Benefits and risks of artificial intelligence in education",
@@ -29,6 +33,7 @@ if st.button("Generate Report", type="primary"):
     else:
         initial_state = {
             "topic": topic,
+            "depth": depth,
             "plan": "",
             "queries": [],
             "sources": [],
