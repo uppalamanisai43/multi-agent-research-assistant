@@ -39,15 +39,13 @@ def remove_thinking(text: str) -> str:
 
 
 def ask_llm(prompt: str) -> str:
-    """Wait and retry if Groq temporarily reaches its token limit."""
+    """Retry temporarily rate-limited Groq requests."""
     for attempt in range(3):
         try:
             return remove_thinking(llm.invoke(prompt).content)
-
         except RateLimitError:
             if attempt == 2:
                 raise
-
             time.sleep(8)
 
     raise RuntimeError("Unable to receive an LLM response.")
@@ -189,9 +187,16 @@ Write a concise Markdown report with:
 ## Limitations
 ## Sources
 
-Use only these sources. Never invent facts or URLs.
-Cite claims as [1], [2], etc., and list used source URLs under Sources.
-Do not show reasoning or think tags.
+Rules:
+- Use only the sources given below.
+- Never invent facts or URLs.
+- Cite claims in the report as [1], [2], and so on.
+- Under ## Sources, use exactly this format:
+
+- [1] Source title — https://example.com
+
+- Never put citation labels such as [1] or 【1】 inside a URL.
+- Do not show reasoning or think tags.
 
 Sources:
 {source_text}
